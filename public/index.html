@@ -7,24 +7,24 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family:'Inter', sans-serif; }
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
 body { background:#f0f2f5; }
-.container, #loginBox { max-width:800px; margin:40px auto; background:#fff; padding:30px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); }
+.container, #loginBox { max-width:900px; margin:40px auto; background:#fff; padding:30px; border-radius:18px; box-shadow:0 10px 25px rgba(0,0,0,0.12); }
 h2 { color:#222; margin-bottom:15px; font-weight:600; }
-p { color:#555; margin-bottom:15px; font-size:15px; }
+p { color:#555; margin-bottom:12px; font-size:15px; }
 input, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #ccc; font-size:16px; transition:0.3s; }
 input:focus { border-color:#0077ff; outline:none; }
 button { background:#0077ff; color:#fff; border:none; cursor:pointer; font-weight:600; }
 button:hover { background:#005ecc; }
-#map { height:450px; margin-top:20px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.1); }
-.links { margin-top:15px; background:#f8f9fa; padding:12px; border-radius:10px; }
+#map { height:500px; margin-top:20px; border-radius:14px; box-shadow:0 5px 15px rgba(0,0,0,0.1); }
+.links { margin-top:15px; background:#f8f9fa; padding:12px; border-radius:12px; }
 .links a { color:#0077ff; text-decoration:none; font-weight:600; }
 .links a:hover { text-decoration:underline; }
 .reset-btn { background:#ff4b5c; margin-top:15px; }
 .reset-btn:hover { background:#c0392b; }
 .lang-select { text-align:right; margin-bottom:10px; }
 .lang-select button { width:auto; padding:6px 12px; font-size:14px; border-radius:8px; margin-left:5px; }
-.result { display:none; }
+.result { display:none; white-space:pre-wrap; max-height:300px; overflow-y:auto; background:#eef6ff; padding:10px; border-radius:10px; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -45,7 +45,8 @@ button:hover { background:#005ecc; }
 <!-- Main Container -->
 <div class="container" style="display:none;">
   <h2 id="mainTitle">Ibiza Parzellen- & Eigentümerfinder</h2>
-  <p id="mainText">Adresse eingeben oder auf die Karte klicken</p>
+  <p id="mainText">Adresse oder Referencia Catastral eingeben oder auf die Karte klicken</p>
+
   <input id="rcInput" type="text" placeholder="Referencia Catastral">
   <button onclick="fetchKataster()" id="searchBtn">Suchen</button>
 
@@ -75,29 +76,23 @@ let lang = 'DE';
 
 function setLang(l){
   lang = l;
-  if(l==='DE'){
-    document.getElementById('loginTitle').innerText='Login';
-    document.getElementById('loginText').innerText='Bitte einloggen';
-    document.getElementById('loginBtn').innerText='Login';
-    document.getElementById('mainTitle').innerText='Ibiza Parzellen- & Eigentümerfinder';
-    document.getElementById('mainText').innerText='Adresse eingeben oder auf die Karte klicken';
-    document.getElementById('searchBtn').innerText='Suchen';
-    document.getElementById('resetBtn').innerText='Neue Suche';
-    document.getElementById('catastroLabel').innerText='Katasteramt:';
-    document.getElementById('registroLabel').innerText='Registro de la Propiedad:';
-    document.getElementById('streetLabel').innerText='Google Street View:';
-  } else {
-    document.getElementById('loginTitle').innerText='Login';
-    document.getElementById('loginText').innerText='Please login';
-    document.getElementById('loginBtn').innerText='Login';
-    document.getElementById('mainTitle').innerText='Ibiza Parcels & Owners Finder';
-    document.getElementById('mainText').innerText='Enter address or click on the map';
-    document.getElementById('searchBtn').innerText='Search';
-    document.getElementById('resetBtn').innerText='New search';
-    document.getElementById('catastroLabel').innerText='Catastro:';
-    document.getElementById('registroLabel').innerText='Property Registry:';
-    document.getElementById('streetLabel').innerText='Google Street View:';
-  }
+  const texts = {
+    DE: {
+      loginTitle:'Login', loginText:'Bitte einloggen', loginBtn:'Login',
+      mainTitle:'Ibiza Parzellen- & Eigentümerfinder', mainText:'Adresse oder Referencia Catastral eingeben oder auf die Karte klicken',
+      searchBtn:'Suchen', resetBtn:'Neue Suche',
+      catastroLabel:'Katasteramt:', registroLabel:'Registro de la Propiedad:', streetLabel:'Google Street View:'
+    },
+    EN: {
+      loginTitle:'Login', loginText:'Please login', loginBtn:'Login',
+      mainTitle:'Ibiza Parcels & Owners Finder', mainText:'Enter address or cadastral reference or click on map',
+      searchBtn:'Search', resetBtn:'New search',
+      catastroLabel:'Catastro:', registroLabel:'Property Registry:', streetLabel:'Google Street View:'
+    }
+  };
+  Object.keys(texts[lang]).forEach(id=>{
+    if(document.getElementById(id)) document.getElementById(id).innerText = texts[lang][id];
+  });
 }
 
 function login(){
@@ -110,10 +105,14 @@ function login(){
   } else alert(lang==='DE'?'Falsche Zugangsdaten':'Wrong credentials');
 }
 
+// Leaflet-Karte initialisieren
 const map = L.map('map').setView([38.9067,1.4206],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap'
+}).addTo(map);
 let marker;
 
+// Klick auf Karte
 map.on('click',function(e){
   const {lat,lng}=e.latlng;
   if(marker) map.removeLayer(marker);
@@ -124,20 +123,26 @@ map.on('click',function(e){
   window.open(streetViewUrl,'_blank');
 });
 
+// Katasterdaten via Proxy abrufen
 function fetchKataster(){
   const rc=document.getElementById('rcInput').value.trim();
-  if(!rc) return;
+  if(!rc) return alert(lang==='DE'?'Referencia Catastral erforderlich':'Cadastral reference required');
+
   fetch(`/kataster?rc=${rc}`)
     .then(res=>res.text())
     .then(txt=>{
       document.getElementById('katasterOutput').innerText=txt;
       document.getElementById('resultBox').style.display='block';
-    }).catch(err=>alert('Fehler beim Abrufen der Katasterdaten'));
-  // Street View Link optional
-  document.getElementById('streetViewLink').href=`https://www.google.com/maps/search/?api=1&query=${rc}&layer=c`;
-  window.open(document.getElementById('streetViewLink').href,'_blank');
+    })
+    .catch(err=>alert('Fehler beim Abrufen der Katasterdaten'));
+
+  // Optional Street View via Parzelle
+  const streetUrl=`https://www.google.com/maps/search/?api=1&query=${rc}&layer=c`;
+  document.getElementById('streetViewLink').href = streetUrl;
+  window.open(streetUrl,'_blank');
 }
 
+// Reset
 function resetSearch(){
   document.getElementById('rcInput').value='';
   document.getElementById('katasterOutput').innerText='';
