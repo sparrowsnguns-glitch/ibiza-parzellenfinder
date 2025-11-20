@@ -1,82 +1,114 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8" />
-<title>Ibiza Parzellenfinder</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-<style>
-  body { font-family: Arial; margin: 0; padding: 0; }
-  #map { height: 90vh; width: 100%; }
-  #info { padding: 15px; background: #f3f3f3; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ibiza Parzellen- & Eigentümerfinder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f3f3f3; margin:0; padding:0; }
+    .container, #loginBox { max-width: 800px; margin: 40px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 6px 25px rgba(0,0,0,0.15); }
+    h2 { color:#333; }
+    input, button { width: 100%; padding: 12px; margin-top: 10px; border-radius:6px; border:1px solid #ccc; font-size:16px; }
+    button { background:#000; color:white; cursor:pointer; border:none; transition:0.3s; }
+    button:hover { background:#222; }
+    #map { height: 400px; margin-top:20px; border-radius:10px; }
+    .links { margin-top:20px; background:#fafafa; padding:10px; border-radius:6px; }
+    .result { margin-top:20px; background:#e7f7ff; padding:15px; border-radius:6px; display:none; }
+    iframe { width: 100%; height: 500px; border: none; margin-top:15px; border-radius:6px; }
+  </style>
 </head>
-
 <body>
 
-<div id="info">
-  <h2>Ibiza Parzellenfinder</h2>
-  <p>Klicke eine Stelle auf der Karte an → automatisch öffnen:</p>
-  <ul>
-    <li>📍 Katasteramt mit Koordinaten</li>
-    <li>🚗 Google Street View an der Position</li>
-  </ul>
-  <p><strong>Hinweis:</strong> Daten werden über deinen Proxy-Server abgefragt.</p>
+<!-- Login Box -->
+<div id="loginBox">
+  <h2>Login</h2>
+  <p>Bitte einloggen, um den Parzellenfinder zu nutzen.</p>
+  <input id="loginUser" type="text" placeholder="Benutzername" />
+  <input id="loginPass" type="password" placeholder="Passwort" />
+  <button onclick="login()">Login</button>
 </div>
 
-<div id="map"></div>
+<!-- Hauptcontainer -->
+<div class="container" style="display:none;">
+  <h2>Ibiza Parzellen- & Eigentümerfinder</h2>
+  <p>Klicke auf die Karte oder gib die Adresse ein, um Kataster- & Grundbuch-Links automatisch zu generieren.</p>
 
-<!-- Leaflet Script -->
+  <input id="addressInput" type="text" placeholder="Adresse eingeben (z. B. Calle..., Ibiza)" />
+  <button onclick="searchParcel()">Suchen</button>
+
+  <div class="result" id="resultBox">
+    <h3>Automatische Kataster-Links</h3>
+    <p><strong>Katasteramt (Spanisches Catastro):</strong></p>
+    <a id="catastroLink" href="#" target="_blank">Öffnen in neuem Tab</a>
+    <iframe id="catastroIframe"></iframe>
+    <p style="margin-top:15px;"><strong>Eigentümerauskunft (Registro de la Propiedad):</strong></p>
+    <a id="registroLink" href="#" target="_blank">Öffnen in neuem Tab</a>
+  </div>
+
+  <button onclick="resetSearch()" style="width:100%;padding:12px;margin-top:20px;background:#b30000;color:white;">Neue Suche</button>
+
+  <div id="map"></div>
+</div>
+
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
 <script>
-// Karte erstellen
-const map = L.map('map').setView([38.98, 1.43], 11); // Ibiza
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
-
-// Klick-Event
-map.on("click", async (e) => {
-  const lat = e.latlng.lat;
-  const lon = e.latlng.lng;
-
-  alert(`Du hast geklickt:\nLat: ${lat}\nLon: ${lon}`);
-
-  // Google Street View automatisch öffnen
-  const streetUrl = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lon}`;
-  window.open(streetUrl, "_blank");
-
-  // Katasteramt Spanien öffnen (Koordinaten-Suche)
-  const catastroUrl = `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?buscar=S&Coordenada_X=${lon}&Coordenada_Y=${lat}&SRS=EPSG:4326`;
-  window.open(catastroUrl, "_blank");
-
-  // Proxy → Referenznummer abrufen
-  try {
-    const rcResp = await fetch(`/kataster?lat=${lat}&lon=${lon}`);
-    const xmlText = await rcResp.text();
-
-    console.log("XML vom Proxy:", xmlText);
-
-    const rcMatch = xmlText.match(/<rc>(.*?)<\/rc>/);
-    if (rcMatch) {
-      const rc = rcMatch[1];
-      alert("Referencia Catastral gefunden: " + rc);
-
-      // Öffne Kataster-Details mit RC
-      const detailUrl = `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${rc}`;
-      window.open(detailUrl, "_blank");
-    }
-  } catch (err) {
-    alert("Fehler beim Abrufen der RC.");
+  // Temporäres Login ohne Token
+  function login(){
+    const user = document.getElementById('loginUser').value;
+    const pass = document.getElementById('loginPass').value;
+    if(user==='Nicole' && pass==='ichliebekatzen'){
+      document.getElementById('loginBox').style.display='none';
+      document.querySelector('.container').style.display='block';
+    } else alert('Falsche Zugangsdaten.');
   }
-});
-</script>
 
+  // Karte initialisieren
+  const map = L.map('map').setView([38.9067,1.4206],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'© OpenStreetMap'}).addTo(map);
+  let marker;
+
+  map.on('click',function(e){
+    const {lat,lng}=e.latlng;
+    if(marker) map.removeLayer(marker);
+    marker=L.marker([lat,lng]).addTo(map);
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`)
+      .then(res=>res.json())
+      .then(data=>{
+        if(data && data.display_name){
+          document.getElementById('addressInput').value='';
+          document.getElementById('addressInput').value=data.display_name;
+          updateLinks(data.display_name,true);
+        }
+      }).catch(err=>console.error('Geocoding Fehler:',err));
+  });
+
+  function searchParcel(){
+    const address=document.getElementById('addressInput').value.trim();
+    updateLinks(address,false);
+  }
+
+  function updateLinks(address,autoOpen){
+    if(!address) return;
+    const catastroUrl=`https://www.sedecatastro.gob.es/OVCFrames.aspx?TIPO=consulta&buscar=1&campoaddr=${encodeURIComponent(address)}`;
+    const registroUrl=`https://sede.registradores.org/site/acceso?buscar=${encodeURIComponent(address)}`;
+    document.getElementById('catastroLink').href=catastroUrl;
+    document.getElementById('registroLink').href=registroUrl;
+    document.getElementById('resultBox').style.display='block';
+    document.getElementById('catastroIframe').src=catastroUrl;
+    if(autoOpen){
+      window.open(catastroUrl,'_blank');
+      window.open(registroUrl,'_blank');
+    }
+  }
+
+  function resetSearch(){
+    document.getElementById('addressInput').value='';
+    document.getElementById('resultBox').style.display='none';
+    document.getElementById('catastroIframe').src='';
+    if(marker){ map.removeLayer(marker); marker=null; }
+  }
+</script>
 </body>
 </html>
-
