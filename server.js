@@ -7,15 +7,25 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.static('public'));
 
+const katHeaders = {
+  "User-Agent": "Mozilla/5.0",
+  "Accept": "application/xml,text/xml,*/*",
+  "Host": "www1.sedecatastro.gob.es",
+  "Referer": "https://www1.sedecatastro.gob.es/",
+};
+
 // 1️⃣ Koordinaten → Referencia Catastral
 app.get('/rc-from-coords', async (req, res) => {
   const { lat, lon } = req.query;
   if (!lat || !lon) return res.status(400).send("lat & lon fehlen");
 
-  const url = `https://www1.sedecatastro.gob.es/OVCServWeb/OVCSWLocalizacionRC/OVCSWLocalizacionRC.asmx/Consulta_RCCOOR?SRS=EPSG:4326&Coordenada_X=${lon}&Coordenada_Y=${lat}`;
+  const url =
+    `https://www1.sedecatastro.gob.es/OVCServWeb/OVCSWLocalizacionRC/` +
+    `OVCSWLocalizacionRC.asmx/Consulta_RCCOOR?SRS=EPSG:4326&` +
+    `Coordenada_X=${lon}&Coordenada_Y=${lat}`;
 
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { headers: katHeaders });
     const txt = await r.text();
     res.send(txt);
   } catch (err) {
@@ -28,10 +38,12 @@ app.get('/parcel-info', async (req, res) => {
   const { rc } = req.query;
   if (!rc) return res.status(400).send("Referencia Catastral fehlt");
 
-  const url = `https://www1.sedecatastro.gob.es/OVCServWeb/OVCSWConsultaParcelario/OVCSWConsultaParcelario.asmx/Consulta_DNP?RefCatastral=${rc}`;
+  const url =
+    `https://www1.sedecatastro.gob.es/OVCServWeb/OVCSWConsultaParcelario/` +
+    `OVCSWConsultaParcelario.asmx/Consulta_DNP?RefCatastral=${rc}`;
 
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, { headers: katHeaders });
     const txt = await r.text();
     res.send(txt);
   } catch (err) {
@@ -39,4 +51,6 @@ app.get('/parcel-info', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`Server läuft auf http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Server läuft auf http://localhost:${PORT}`)
+);
