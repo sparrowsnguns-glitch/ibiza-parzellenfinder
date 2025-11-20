@@ -1,1 +1,82 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<title>Ibiza Parzellenfinder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<style>
+  body { font-family: Arial; margin: 0; padding: 0; }
+  #map { height: 90vh; width: 100%; }
+  #info { padding: 15px; background: #f3f3f3; }
+</style>
+</head>
+
+<body>
+
+<div id="info">
+  <h2>Ibiza Parzellenfinder</h2>
+  <p>Klicke eine Stelle auf der Karte an → automatisch öffnen:</p>
+  <ul>
+    <li>📍 Katasteramt mit Koordinaten</li>
+    <li>🚗 Google Street View an der Position</li>
+  </ul>
+  <p><strong>Hinweis:</strong> Daten werden über deinen Proxy-Server abgefragt.</p>
+</div>
+
+<div id="map"></div>
+
+<!-- Leaflet Script -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+// Karte erstellen
+const map = L.map('map').setView([38.98, 1.43], 11); // Ibiza
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+// Klick-Event
+map.on("click", async (e) => {
+  const lat = e.latlng.lat;
+  const lon = e.latlng.lng;
+
+  alert(`Du hast geklickt:\nLat: ${lat}\nLon: ${lon}`);
+
+  // Google Street View automatisch öffnen
+  const streetUrl = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lon}`;
+  window.open(streetUrl, "_blank");
+
+  // Katasteramt Spanien öffnen (Koordinaten-Suche)
+  const catastroUrl = `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?buscar=S&Coordenada_X=${lon}&Coordenada_Y=${lat}&SRS=EPSG:4326`;
+  window.open(catastroUrl, "_blank");
+
+  // Proxy → Referenznummer abrufen
+  try {
+    const rcResp = await fetch(`/kataster?lat=${lat}&lon=${lon}`);
+    const xmlText = await rcResp.text();
+
+    console.log("XML vom Proxy:", xmlText);
+
+    const rcMatch = xmlText.match(/<rc>(.*?)<\/rc>/);
+    if (rcMatch) {
+      const rc = rcMatch[1];
+      alert("Referencia Catastral gefunden: " + rc);
+
+      // Öffne Kataster-Details mit RC
+      const detailUrl = `https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?refcat=${rc}`;
+      window.open(detailUrl, "_blank");
+    }
+  } catch (err) {
+    alert("Fehler beim Abrufen der RC.");
+  }
+});
+</script>
+
+</body>
+</html>
 
