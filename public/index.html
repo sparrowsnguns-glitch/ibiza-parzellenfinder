@@ -1,154 +1,466 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ibiza Parzellen- & Eigentümerfinder</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Ibiza Parcels — Parzellenfinder</title>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
-body { background:#f0f2f5; }
-.container, #loginBox { max-width:900px; margin:40px auto; background:#fff; padding:30px; border-radius:18px; box-shadow:0 10px 25px rgba(0,0,0,0.12); }
-h2 { color:#222; margin-bottom:15px; font-weight:600; }
-p { color:#555; margin-bottom:12px; font-size:15px; }
-input, button { width:100%; padding:12px; margin-top:10px; border-radius:10px; border:1px solid #ccc; font-size:16px; transition:0.3s; }
-input:focus { border-color:#0077ff; outline:none; }
-button { background:#0077ff; color:#fff; border:none; cursor:pointer; font-weight:600; }
-button:hover { background:#005ecc; }
-#map { height:500px; margin-top:20px; border-radius:14px; box-shadow:0 5px 15px rgba(0,0,0,0.1); }
-.links { margin-top:15px; background:#f8f9fa; padding:12px; border-radius:12px; }
-.links a { color:#0077ff; text-decoration:none; font-weight:600; }
-.links a:hover { text-decoration:underline; }
-.reset-btn { background:#ff4b5c; margin-top:15px; }
-.reset-btn:hover { background:#c0392b; }
-.lang-select { text-align:right; margin-bottom:10px; }
-.lang-select button { width:auto; padding:6px 12px; font-size:14px; border-radius:8px; margin-left:5px; }
-.result { display:none; white-space:pre-wrap; max-height:300px; overflow-y:auto; background:#eef6ff; padding:10px; border-radius:10px; margin-top:10px; }
+  :root{
+    --bg:#f6f7f9;
+    --card:#ffffff;
+    --muted:#6b7280;
+    --accent:#0b63ff;
+    --danger:#ff4b5c;
+    --radius:14px;
+    --shadow: 0 10px 30px rgba(11,99,255,0.06), 0 2px 6px rgba(9,10,20,0.04);
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  body{margin:0;background:var(--bg);color:#111;line-height:1.35}
+  .wrap{max-width:1000px;margin:36px auto;padding:22px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .brand{display:flex;gap:14px;align-items:center}
+  .logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#0b63ff,#4aa0ff);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;box-shadow:var(--shadow)}
+  .title{font-size:18px;font-weight:700}
+  .subtitle{font-size:13px;color:var(--muted)}
+  .controls{display:flex;gap:10px;align-items:center}
+
+  /* Card / container */
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+  #loginBox, #mainBox{max-width:900px;margin:0 auto}
+
+  /* login */
+  .field{margin-top:10px}
+  input[type=text], input[type=password], button {
+    width:100%;padding:12px;border-radius:10px;border:1px solid #e6e9ef;font-size:15px;
+  }
+  .small{font-size:13px;color:var(--muted)}
+  button.primary{background:var(--accent);color:#fff;border:none;font-weight:600}
+  button.ghost{background:transparent;border:1px solid #e6e9ef;color:var(--muted)}
+  .lang-switch{display:flex;gap:8px}
+
+  /* layout */
+  .grid{display:grid;grid-template-columns:1fr 420px;gap:18px;margin-top:18px}
+  .left{min-height:520px}
+  #map{height:520px;border-radius:12px;overflow:hidden}
+  .right{display:flex;flex-direction:column;gap:12px}
+
+  .searchRow{display:flex;gap:10px}
+  .searchRow input{flex:1}
+  .infoBox{padding:12px;border-radius:12px;background:#fbfdff;border:1px solid #eef6ff; font-size:14px}
+  .links{display:flex;flex-direction:column;gap:8px}
+  .linkBtn{display:inline-block;padding:10px;border-radius:10px;background:#fff;border:1px solid #eef6ff;color:var(--accent);text-decoration:none;font-weight:600}
+  .danger{background:var(--danger);color:#fff;border:none}
+
+  /* parcel detail */
+  .parcelCard{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:#fff;border:1px solid #eef6ff}
+  .kv{display:flex;justify-content:space-between;font-size:14px}
+  .sectionTitle{font-weight:700;margin-top:8px}
+  pre.xml{background:#0b1220;color:#dbeafe;padding:12px;border-radius:8px;overflow:auto;font-size:12px}
+
+  footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+
+  @media (max-width:980px){
+    .grid{grid-template-columns:1fr; }
+    #map{height:360px}
+    .controls{display:none}
+  }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<!-- Login -->
-<div id="loginBox">
-  <div class="lang-select">
-    <button onclick="setLang('DE')">DE</button>
-    <button onclick="setLang('EN')">EN</button>
+  <header>
+    <div class="brand">
+      <div class="logo">IB</div>
+      <div>
+        <div class="title">Ibiza Parzellenfinder</div>
+        <div class="subtitle" id="subtitle">Minimal • Legal • Fast</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="lang-switch">
+        <button class="ghost" onclick="setLang('DE')">DE</button>
+        <button class="ghost" onclick="setLang('EN')">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- LOGIN -->
+  <div id="loginBox" class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-weight:700;font-size:16px" id="loginTitle">Login</div>
+        <div class="small" id="loginText">Bitte einloggen</div>
+      </div>
+      <div style="text-align:right" class="small"><span id="langHint">DE</span></div>
+    </div>
+
+    <div class="field">
+      <input id="loginUser" type="text" placeholder="Benutzername" autocomplete="username">
+    </div>
+    <div class="field">
+      <input id="loginPass" type="password" placeholder="Passwort" autocomplete="current-password">
+    </div>
+    <div class="field" style="display:flex;gap:10px">
+      <button class="primary" onclick="login()">Login</button>
+      <button class="ghost" onclick="fillDemo()">Demo</button>
+    </div>
+    <p class="small" style="margin-top:8px" id="loginHelp">Login required to view parcels.</p>
   </div>
-  <h2 id="loginTitle">Login</h2>
-  <p id="loginText">Bitte einloggen</p>
-  <input id="loginUser" type="text" placeholder="Benutzername">
-  <input id="loginPass" type="password" placeholder="Passwort">
-  <button onclick="login()" id="loginBtn">Login</button>
-</div>
 
-<!-- Main Container -->
-<div class="container" style="display:none;">
-  <h2 id="mainTitle">Ibiza Parzellen- & Eigentümerfinder</h2>
-  <p id="mainText">Adresse oder Referencia Catastral eingeben oder auf die Karte klicken</p>
+  <!-- MAIN -->
+  <div id="mainBox" class="card" style="display:none;margin-top:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-weight:700;font-size:18px" id="mainTitle">Ibiza Parzellen- & Eigentümerfinder</div>
+        <div class="small" id="mainText">Adresse oder Referencia Catastral eingeben oder auf die Karte klicken</div>
+      </div>
+      <div style="min-width:220px">
+        <div style="display:flex;gap:8px">
+          <input id="rcInputHeader" type="text" placeholder="Referencia Catastral / Adresse" style="padding:10px;border-radius:10px;border:1px solid #e8eefc;flex:1" />
+          <button class="primary" onclick="performHeaderSearch()">Suchen</button>
+        </div>
+      </div>
+    </div>
 
-  <input id="rcInput" type="text" placeholder="Referencia Catastral">
-  <button onclick="fetchKataster()" id="searchBtn">Suchen</button>
+    <div class="grid" style="margin-top:16px">
+      <div class="left">
+        <div id="map" class="card"></div>
+      </div>
 
-  <div class="result" id="resultBox">
-    <div class="links">
-      <p><strong id="catastroLabel">Katasteramt:</strong></p>
-      <a id="catastroLink" href="https://www.sedecatastro.gob.es/OVCInicio.aspx" target="_blank">Öffnen</a>
+      <aside class="right">
+        <div class="infoBox">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700" id="infoTitle">Parzelleninfo</div>
+              <div class="small" id="infoSub">Klick auf Karte oder gebe Referencia Catastral ein</div>
+            </div>
+            <div>
+              <button class="ghost" onclick="resetSearch()">Neue Suche</button>
+            </div>
+          </div>
+
+          <div class="links" style="margin-top:12px">
+            <a id="catastroLink" class="linkBtn" href="https://www.sedecatastro.gob.es/OVCInicio.aspx" target="_blank">Open Catastro</a>
+            <a id="registroLink" class="linkBtn" href="https://sede.registradores.org/site/acceso" target="_blank">Open Registro</a>
+            <a id="streetViewLink" class="linkBtn" href="#" target="_blank">Open Street View</a>
+          </div>
+        </div>
+
+        <div id="parcelPanel" class="parcelCard" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-weight:700" id="rcDisplay">REF: —</div>
+            <div class="small" id="munDisplay">—</div>
+          </div>
+
+          <div class="kv"><div>Polígono / Parcela</div><div id="polyParcel">—</div></div>
+          <div class="kv"><div>Fläche</div><div id="area">—</div></div>
+          <div class="kv"><div>Nutzung</div><div id="usage">—</div></div>
+          <div class="kv"><div>Inmuebles (Gebäude)</div><div id="inmuebles">—</div></div>
+
+          <div class="sectionTitle">Zusätzliche Links</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <a id="croquisLink" class="linkBtn" href="#" target="_blank" style="display:none">Croquis</a>
+            <a id="fotoLink" class="linkBtn" href="#" target="_blank" style="display:none">Fotos</a>
+            <a id="rawXmlLink" class="linkBtn" href="#" target="_blank" style="display:none">Roh XML</a>
+          </div>
+        </div>
+
+        <div id="rawXml" style="display:none;margin-top:10px">
+          <div style="font-weight:700;margin-bottom:6px">Rohdaten (XML)</div>
+          <pre id="xmlOutput" class="xml" style="max-height:240px"></pre>
+        </div>
+      </aside>
     </div>
-    <div class="links">
-      <p><strong id="registroLabel">Registro de la Propiedad:</strong></p>
-      <a id="registroLink" href="https://sede.registradores.org/site/acceso" target="_blank">Öffnen</a>
-    </div>
-    <div class="links">
-      <p><strong id="streetLabel">Google Street View:</strong></p>
-      <a id="streetViewLink" href="#" target="_blank">Öffnen</a>
-    </div>
-    <pre id="katasterOutput"></pre>
+
+    <footer>
+      <div class="small">Built for Ibiza — legal data via Catastro webservices</div>
+    </footer>
   </div>
-
-  <button class="reset-btn" onclick="resetSearch()" id="resetBtn">Neue Suche</button>
-  <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
+/* ---------------------------
+   CONFIG / small helpers
+   --------------------------- */
 let lang = 'DE';
-
-function setLang(l){
-  lang = l;
-  const texts = {
-    DE: {
-      loginTitle:'Login', loginText:'Bitte einloggen', loginBtn:'Login',
-      mainTitle:'Ibiza Parzellen- & Eigentümerfinder', mainText:'Adresse oder Referencia Catastral eingeben oder auf die Karte klicken',
-      searchBtn:'Suchen', resetBtn:'Neue Suche',
-      catastroLabel:'Katasteramt:', registroLabel:'Registro de la Propiedad:', streetLabel:'Google Street View:'
-    },
-    EN: {
-      loginTitle:'Login', loginText:'Please login', loginBtn:'Login',
-      mainTitle:'Ibiza Parcels & Owners Finder', mainText:'Enter address or cadastral reference or click on map',
-      searchBtn:'Search', resetBtn:'New search',
-      catastroLabel:'Catastro:', registroLabel:'Property Registry:', streetLabel:'Google Street View:'
-    }
-  };
-  Object.keys(texts[lang]).forEach(id=>{
-    if(document.getElementById(id)) document.getElementById(id).innerText = texts[lang][id];
-  });
+const rcPattern = /[0-9A-Z]{8,20}/i; // broad RC matcher
+function setLang(l){ lang=l; document.getElementById('langHint').innerText = l; 
+  // translate UI labels
+  if(l==='DE'){
+    document.getElementById('loginText').innerText='Bitte einloggen';
+    document.getElementById('loginHelp').innerText='Login required to view parcels.';
+    document.getElementById('mainText').innerText='Adresse oder Referencia Catastral eingeben oder auf die Karte klicken';
+    document.getElementById('infoSub').innerText='Klick auf Karte oder gebe Referencia Catastral ein';
+    document.getElementById('infoTitle').innerText='Parzelleninfo';
+    document.getElementById('rcInputHeader').placeholder='Referencia Catastral / Adresse';
+    document.getElementById('catastroLink').innerText='Catastro öffnen';
+    document.getElementById('registroLink').innerText='Registro öffnen';
+    document.getElementById('streetViewLink').innerText='Street View öffnen';
+  } else {
+    document.getElementById('loginText').innerText='Please login';
+    document.getElementById('loginHelp').innerText='Login required to view parcels.';
+    document.getElementById('mainText').innerText='Enter address or cadastral reference or click on map';
+    document.getElementById('infoSub').innerText='Click map or enter cadastral reference';
+    document.getElementById('infoTitle').innerText='Parcel info';
+    document.getElementById('rcInputHeader').placeholder='Cadastral reference / Address';
+    document.getElementById('catastroLink').innerText='Open Catastro';
+    document.getElementById('registroLink').innerText='Open Registro';
+    document.getElementById('streetViewLink').innerText='Open Street View';
+  }
 }
 
+/* ---------------------------
+   LOGIN + basic flow
+   --------------------------- */
 function login(){
-  const user=document.getElementById('loginUser').value;
-  const pass=document.getElementById('loginPass').value;
-  if(user==='Nicole' && pass==='ichliebekatzen'){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value.trim();
+  if(u==='Nicole' && p==='ichliebekatzen'){
     document.getElementById('loginBox').style.display='none';
-    document.querySelector('.container').style.display='block';
-    setTimeout(()=>{ map.invalidateSize(); },100);
-  } else alert(lang==='DE'?'Falsche Zugangsdaten':'Wrong credentials');
+    document.getElementById('mainBox').style.display='block';
+    setTimeout(()=>{ map.invalidateSize(); }, 120);
+  } else {
+    alert(lang==='DE'?'Falsche Zugangsdaten':'Wrong credentials');
+  }
+}
+function fillDemo(){
+  document.getElementById('loginUser').value='Nicole';
+  document.getElementById('loginPass').value='ichliebekatzen';
 }
 
-// Leaflet-Karte initialisieren
-const map = L.map('map').setView([38.9067,1.4206],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap'
-}).addTo(map);
-let marker;
+/* ---------------------------
+   MAP init + fix
+   --------------------------- */
+const map = L.map('map',{scrollWheelZoom:true}).setView([38.9067,1.4206],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+let marker = null;
 
-// Klick auf Karte
-map.on('click',function(e){
-  const {lat,lng}=e.latlng;
+/* helper: extract RC from xml/dom/text */
+function extractRCFromXml(text){
+  // try DOM parse and common tags
+  try{
+    const doc = new DOMParser().parseFromString(text,'text/xml');
+    const candidates = ['rc','RC','ReferenciaCatastral','Referencia','REFCATASTRAL','refcat','refCatastral'];
+    for(const tag of candidates){
+      const el = doc.getElementsByTagName(tag)[0];
+      if(el && el.textContent) {
+        const val = el.textContent.trim();
+        const m = val.match(rcPattern);
+        if(m) return m[0];
+      }
+    }
+    // fallback: search for pattern in entire text (uppercase)
+    const up = text.toUpperCase();
+    const rx = up.match(/[0-9A-Z]{8,20}/g);
+    if(rx && rx.length) return rx[0];
+  }catch(e){}
+  return null;
+}
+
+/* helper parse parcel-info xml -> fields */
+function parseParcelXml(text){
+  const doc = new DOMParser().parseFromString(text,'text/xml');
+  const getText = (names)=>{
+    for(const name of names){
+      const el = doc.getElementsByTagName(name)[0];
+      if(el && el.textContent) return el.textContent.trim();
+    }
+    return null;
+  };
+  // common fields (best-effort)
+  const ref = getText(['REFCATASTRAL','RefCatastral','refCatastral','refcat','ReferenciaCatastral','referencia']);
+  const municipio = getText(['MUNICIPIO','municipio','NOM_MUNICIPIO','nombreMunicipio']);
+  const superf = getText(['SUPERFICIE','superficie','sup','AREA','Superficie']);
+  const uso = getText(['USO','uso','LUSO','luso','usoDescripcion']);
+  const pol = getText(['POLIGONO','poligono','POL']);
+  const parcela = getText(['PARCELA','parcela','PAR']);
+  const inmuebles = getText(['INMUEBLE','inmueble','NUM_INMUEBLES','inmuebles']); // sometimes aggregated
+  // find croquis or image url
+  let croquis = null, foto = null;
+  // search for elements that look like image urls
+  const imgs = doc.getElementsByTagName('imagen');
+  if(imgs && imgs.length){
+    croquis = imgs[0].textContent.trim();
+  }
+  // fallback search for tags that contain 'url' or 'http' in text content
+  const allText = text;
+  const urlMatch = allText.match(/https?:\/\/[^\s"'<>]+/gi);
+  if(urlMatch && urlMatch.length){
+    // pick likely croquis (contains 'croquis' or 'cartografia' or '.jpg' etc)
+    for(const u of urlMatch){
+      if(/croquis|cartografia|mapa|croqui/i.test(u)) { croquis = u; break; }
+    }
+    for(const u of urlMatch){
+      if(/\.(jpg|jpeg|png|pdf)/i.test(u)) { if(!foto) foto = u; }
+    }
+  }
+  return { ref, municipio, superf, uso, pol, parcela, inmuebles, croquis, foto, raw:text };
+}
+
+/* ---------------------------
+   Map click -> rc-from-coords -> parcel-info
+   --------------------------- */
+map.on('click', async function(e){
+  const {lat, lng} = e.latlng;
+  // place marker
   if(marker) map.removeLayer(marker);
-  marker=L.marker([lat,lng]).addTo(map);
+  marker = L.marker([lat,lng]).addTo(map);
 
-  const streetViewUrl=`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}&heading=0&pitch=0`;
-  document.getElementById('streetViewLink').href=streetViewUrl;
-  window.open(streetViewUrl,'_blank');
+  // update street view link
+  const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}&heading=0&pitch=0`;
+  document.getElementById('streetViewLink').href = streetViewUrl;
+
+  // try to get RC by coords
+  showSpinner(true);
+  try{
+    const rcResp = await fetch(`/rc-from-coords?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`);
+    const rcText = await rcResp.text();
+    const rc = extractRCFromXml(rcText);
+    if(!rc){
+      alert(lang==='DE' ? 'Referencia anhand Koordinaten nicht gefunden' : 'No reference found for coordinates');
+      showSpinner(false);
+      return;
+    }
+    // set UI
+    document.getElementById('rcInputHeader').value = rc;
+    await loadParcelByRC(rc);
+  }catch(err){
+    console.error(err);
+    alert(lang==='DE'?'Fehler Kataster-Koordinaten':'Catastro coordinates error');
+  } finally{
+    showSpinner(false);
+  }
 });
 
-// Katasterdaten via Proxy abrufen
-function fetchKataster(){
-  const rc=document.getElementById('rcInput').value.trim();
-  if(!rc) return alert(lang==='DE'?'Referencia Catastral erforderlich':'Cadastral reference required');
+/* ---------------------------
+   Load parcel info by rc (core)
+   --------------------------- */
+async function loadParcelByRC(rc){
+  showSpinner(true);
+  try{
+    // call proxy parcel-info
+    const resp = await fetch(`/parcel-info?rc=${encodeURIComponent(rc)}`);
+    const txt = await resp.text();
+    // parse
+    const parsed = parseParcelXml(txt);
+    // fill UI
+    document.getElementById('parcelPanel').style.display='block';
+    document.getElementById('rcDisplay').innerText = parsed.ref || rc;
+    document.getElementById('munDisplay').innerText = parsed.municipio || '';
+    document.getElementById('polyParcel').innerText = `${parsed.pol || '—'} / ${parsed.parcela || '—'}`;
+    document.getElementById('area').innerText = parsed.superf ? (parsed.superf + ' m²') : '—';
+    document.getElementById('usage').innerText = parsed.uso || '—';
+    document.getElementById('inmuebles').innerText = parsed.inmuebles || '—';
 
-  fetch(`/kataster?rc=${rc}`)
-    .then(res=>res.text())
-    .then(txt=>{
-      document.getElementById('katasterOutput').innerText=txt;
-      document.getElementById('resultBox').style.display='block';
-    })
-    .catch(err=>alert('Fehler beim Abrufen der Katasterdaten'));
+    // croquis / foto links
+    if(parsed.croquis){ document.getElementById('croquisLink').style.display='inline-block'; document.getElementById('croquisLink').href = parsed.croquis; } else document.getElementById('croquisLink').style.display='none';
+    if(parsed.foto){ document.getElementById('fotoLink').style.display='inline-block'; document.getElementById('fotoLink').href = parsed.foto; } else document.getElementById('fotoLink').style.display='none';
 
-  // Optional Street View via Parzelle
-  const streetUrl=`https://www.google.com/maps/search/?api=1&query=${rc}&layer=c`;
-  document.getElementById('streetViewLink').href = streetUrl;
-  window.open(streetUrl,'_blank');
+    // raw xml
+    document.getElementById('xmlOutput').innerText = txt;
+    document.getElementById('rawXml').style.display='block';
+    document.getElementById('rawXml').scrollIntoView({behavior:'smooth'});
+
+    // set catastro link to the start page (user can manually paste RC)
+    document.getElementById('catastroLink').href = 'https://www.sedecatastro.gob.es/OVCInicio.aspx';
+    // street view for rc: try to open search by RC
+    document.getElementById('streetViewLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parsed.ref || rc)}`;
+
+    // show result area
+    document.getElementById('resultBox').style.display='block';
+    // show raw XML link (open in new tab with data)
+    const blob = new Blob([txt],{type:'application/xml'});
+    const url = URL.createObjectURL(blob);
+    document.getElementById('rawXml').dataset.url = url;
+    document.getElementById('rawXmlLink').href = url;
+    document.getElementById('rawXmlLink').style.display='inline-block';
+  }catch(err){
+    console.error(err);
+    alert(lang==='DE'?'Fehler beim Abrufen der Parzelleninfo':'Error fetching parcel info');
+  }finally{
+    showSpinner(false);
+  }
 }
 
-// Reset
+/* ---------------------------
+   Header search (manual RC or address)
+   --------------------------- */
+async function performHeaderSearch(){
+  const v = document.getElementById('rcInputHeader').value.trim();
+  if(!v) return;
+  // if looks like RC -> load
+  const rcMatch = v.match(rcPattern);
+  if(rcMatch){
+    await loadParcelByRC(rcMatch[0].toUpperCase());
+    return;
+  }
+  // else, try geocode via nominatim -> center map -> then rc-from-coords
+  try{
+    showSpinner(true);
+    const g = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(v)}&limit=1`);
+    const j = await g.json();
+    if(!j || !j.length){ alert(lang==='DE'?'Adresse nicht gefunden':'Address not found'); showSpinner(false); return; }
+    const {lat,lon} = j[0];
+    map.setView([lat,lon],17);
+    if(marker) map.removeLayer(marker);
+    marker = L.marker([lat,lon]).addTo(map);
+    // call rc-from-coords
+    const rcResp = await fetch(`/rc-from-coords?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+    const rcText = await rcResp.text();
+    const rc = extractRCFromXml(rcText);
+    if(!rc){ alert(lang==='DE'?'Referencia nicht gefunden':'Reference not found'); showSpinner(false); return; }
+    document.getElementById('rcInputHeader').value = rc;
+    await loadParcelByRC(rc);
+  }catch(e){
+    console.error(e);
+    alert(lang==='DE'?'Fehler bei der Suche':'Search error');
+  }finally{ showSpinner(false); }
+}
+
+/* ---------------------------
+   Reset / util
+   --------------------------- */
 function resetSearch(){
-  document.getElementById('rcInput').value='';
+  document.getElementById('rcInputHeader').value='';
   document.getElementById('katasterOutput').innerText='';
+  document.getElementById('parcelPanel').style.display='none';
+  document.getElementById('rawXml').style.display='none';
   document.getElementById('resultBox').style.display='none';
+  document.getElementById('rcInputHeader').focus();
   if(marker){ map.removeLayer(marker); marker=null; }
 }
+
+/* ---------------------------
+   Spinner / small helpers
+   --------------------------- */
+let spinner = null;
+function showSpinner(on){
+  if(on){
+    if(!spinner){
+      spinner = document.createElement('div');
+      spinner.style.position='fixed';
+      spinner.style.right='20px';
+      spinner.style.top='20px';
+      spinner.style.padding='8px 12px';
+      spinner.style.borderRadius='10px';
+      spinner.style.background='rgba(0,0,0,0.7)';
+      spinner.style.color='#fff';
+      spinner.style.zIndex='99999';
+      spinner.innerText = lang==='DE' ? 'Lädt...' : 'Loading...';
+      document.body.appendChild(spinner);
+    } else spinner.style.display='block';
+  } else if(spinner) spinner.style.display='none';
+}
+
+/* initialize language */
+setLang('DE');
 </script>
 </body>
 </html>
